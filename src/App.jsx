@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -11,6 +11,9 @@ import Register from "./pages/Register";
 function App() {
   return (
     <Routes>
+      {/* Root path — abhi koi landing page nahi hai, isliye /login pe redirect */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
@@ -45,6 +48,9 @@ function App() {
 
       {/* Widget Route */}
       <Route path="/widget" element={<Widget />} />
+
+      {/* Catch-all — koi bhi unknown path /login pe bhej do, taaki wahan bhi blank screen na aaye */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
