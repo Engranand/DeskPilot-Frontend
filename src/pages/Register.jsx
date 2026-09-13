@@ -35,8 +35,8 @@ const Register = () => {
 
     try {
       const res = await registerUser({ orgName, orgSlug, name, email, password });
-      const { token, user } = res.data;
-      login(user, token);
+      const { token, user, org } = res.data;
+      login(user, token, org);
       navigate("/admin");
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed");

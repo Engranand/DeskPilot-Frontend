@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useEffect } from "react";
+import { createContext, useState, useContext } from "react";
 import { disconnectSocket } from "../lib/socket";
 
 const AuthContext = createContext();
@@ -9,21 +9,30 @@ export const AuthProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const login = (userData, token) => {
+  const [org, setOrg] = useState(() => {
+    const saved = localStorage.getItem("org");
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const login = (userData, token, orgData) => {
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(userData));
+    if (orgData) localStorage.setItem("org", JSON.stringify(orgData));
     setUser(userData);
-  }; 
+    if (orgData) setOrg(orgData);
+  };
 
-const logout = () => {
-  disconnectSocket();
-  localStorage.removeItem("token");
-  localStorage.removeItem("user");
-  setUser(null);
-};
+  const logout = () => {
+    disconnectSocket();
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("org");
+    setUser(null);
+    setOrg(null);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, org, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

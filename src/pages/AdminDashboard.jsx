@@ -17,13 +17,38 @@ const nav = [
   { label: "Settings", key: "settings", icon: IconGear, badge: null },
 ];
 
+const comingSoonPages = {
+  chats: {
+    title: "Conversations",
+    desc: "A unified live-chat inbox across every channel is coming soon.",
+  },
+  ai: {
+    title: "AI Copilot",
+    desc: "The full AI Copilot console — model settings, prompt tuning, and usage — is coming soon.",
+  },
+  kb: {
+    title: "Knowledge Base",
+    desc: "Upload and manage help-center articles for the AI chatbot to reference. Coming soon.",
+  },
+  analytics: {
+    title: "Analytics",
+    desc: "Deeper reporting — response-time trends, CSAT, and agent performance — is coming soon.",
+  },
+  settings: {
+    title: "Settings",
+    desc: "Organization profile, branding, and notification preferences. Coming soon.",
+  },
+};
+
 const AdminDashboard = () => {
   const [active, setActive] = useState("overview");
   const [collapsed, setCollapsed] = useState(false);
   const [tickets, setTickets] = useState([]);
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { user, logout } = useAuth();
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [ticketsFilter, setTicketsFilter] = useState("All");
+  const { user, org, logout } = useAuth();
 
   useEffect(() => {
     fetchTickets();
@@ -50,12 +75,15 @@ const AdminDashboard = () => {
     }
   };
 
-  // Real KPIs, calculated from actual ticket data (no more hardcoded numbers)
+  const getAgentWorkload = (agentId) => {
+    return tickets.filter(
+      (t) => t.assignedAgentId?._id === agentId && t.status !== "resolved" && t.status !== "closed"
+    ).length;
+  };
+
   const openCount = tickets.filter((t) => t.status === "open").length;
-  const resolvedCount = tickets.filter(
-    (t) => t.status === "resolved" || t.status === "closed"
-  ).length;
   const inProgressCount = tickets.filter((t) => t.status === "in_progress").length;
+  const resolvedCount = tickets.filter((t) => t.status === "resolved" || t.status === "closed").length;
 
   const kpis = [
     { label: "Open tickets", value: String(openCount), hint: "currently unresolved" },
@@ -72,16 +100,14 @@ const AdminDashboard = () => {
     return `${Math.floor(diff / 86400)}d`;
   };
 
-  // Client-side workload count from already-fetched tickets.
-  // Fine at small scale; move to a backend aggregation if ticket volume grows a lot.
-  const getAgentWorkload = (agentId) => {
-    return tickets.filter(
-      (t) =>
-        t.assignedAgentId?._id === agentId &&
-        t.status !== "resolved" &&
-        t.status !== "closed"
-    ).length;
-  };
+  const filteredTickets = tickets.filter((t) => {
+    if (ticketsFilter === "Open") return t.status === "open";
+    if (ticketsFilter === "In progress") return t.status === "in_progress";
+    if (ticketsFilter === "Resolved") return t.status === "resolved" || t.status === "closed";
+    return true;
+  });
+
+  const activeLabel = nav.find((n) => n.key === active)?.label || "Overview";
 
   return (
     <div className="min-h-screen bg-background text-foreground font-display flex">
@@ -91,8 +117,8 @@ const AdminDashboard = () => {
       >
         <div className="h-14 flex items-center gap-2 px-4 border-b border-border">
           <div className="size-7 rounded-sm bg-foreground text-background grid place-items-center font-mono text-[10px] font-bold">
-  DP
-</div>
+            DP
+          </div>
           {!collapsed && (
             <div className="flex flex-col leading-tight">
               <span className="text-sm font-bold tracking-tight">DeskPilot</span>
@@ -164,11 +190,7 @@ const AdminDashboard = () => {
                     {user?.role || "admin"}
                   </div>
                 </div>
-                <button
-                  onClick={logout}
-                  className="text-muted-foreground hover:text-foreground"
-                  title="Sign out"
-                >
+                <button onClick={logout} className="text-muted-foreground hover:text-foreground" title="Sign out">
                   <IconLogout className="size-4" />
                 </button>
               </div>
@@ -185,7 +207,7 @@ const AdminDashboard = () => {
             <span>/</span>
             <span className="text-foreground">admin</span>
             <span>/</span>
-            <span className="text-foreground capitalize">{active}</span>
+            <span className="text-foreground">{activeLabel}</span>
           </div>
 
           <div className="flex-1 max-w-md ml-auto md:ml-6">
@@ -214,6 +236,12 @@ const AdminDashboard = () => {
             <IconBell className="size-4" />
             <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-primary" />
           </button>
+          <button
+            onClick={() => setInviteOpen(true)}
+            className="hidden md:inline-flex h-9 items-center gap-1.5 px-3 rounded-md border border-border text-xs font-semibold hover:bg-muted transition-colors"
+          >
+            <IconUsers className="size-4" /> Invite
+          </button>
           <button className="hidden md:inline-flex h-9 items-center gap-1.5 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity">
             <IconPlus className="size-4" /> New ticket
           </button>
@@ -221,227 +249,47 @@ const AdminDashboard = () => {
 
         {/* Content */}
         <main className="flex-1 p-4 md:p-6 space-y-6 overflow-x-hidden">
-          {/* Page header */}
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                § 01 · Overview
-              </div>
-              <h1 className="mt-1 text-2xl md:text-3xl font-bold tracking-tight">
-                Good afternoon, {user?.name?.split(" ")[0] || "Admin"}.
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Here's what's happening across your workspace today.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-xs font-mono">
-              {["24h", "7d", "30d", "QTD"].map((r, i) => (
-                <button
-                  key={r}
-                  className={`px-2.5 py-1.5 rounded-md border transition-colors ${
-                    i === 1
-                      ? "border-primary/40 bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
+          {active === "overview" && (
+            <OverviewPage
+              user={user}
+              kpis={kpis}
+              tickets={tickets}
+              agents={agents}
+              loading={loading}
+              timeAgo={timeAgo}
+              getAgentWorkload={getAgentWorkload}
+            />
+          )}
 
-          {/* KPIs */}
-          <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {kpis.map((k) => (
-              <div
-                key={k.label}
-                className="relative rounded-lg border border-border bg-card p-4 hover:border-primary/30 transition-colors group"
-              >
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
-                  {k.label}
-                </div>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <div className="text-2xl md:text-3xl font-bold tracking-tight">{k.value}</div>
-                </div>
-                <div className="mt-1 text-[11px] text-muted-foreground font-mono">{k.hint}</div>
-              </div>
-            ))}
-          </section>
+          {active === "tickets" && (
+            <TicketsPage
+              tickets={filteredTickets}
+              loading={loading}
+              timeAgo={timeAgo}
+              filter={ticketsFilter}
+              setFilter={setTicketsFilter}
+            />
+          )}
 
-          {/* Grid: chart + ai feed */}
-          <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div className="xl:col-span-2 rounded-lg border border-border bg-card p-4 md:p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                    § Ticket volume
-                  </div>
-                  <div className="text-sm font-semibold mt-0.5">Last 14 days</div>
-                </div>
-              </div>
-              <div className="mt-4 h-40 grid place-items-center text-xs text-muted-foreground font-mono border border-dashed border-border rounded-md">
-                Chart coming soon — needs a volume-by-day endpoint
-              </div>
-            </div>
+          {active === "agents" && (
+            <AgentsPage
+              agents={agents}
+              loading={loading}
+              getAgentWorkload={getAgentWorkload}
+              onInvite={() => setInviteOpen(true)}
+            />
+          )}
 
-            <div className="rounded-lg border border-border bg-card p-4 md:p-5">
-              <div className="flex items-center justify-between">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                  § AI Copilot activity
-                </div>
-                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground font-mono">
-                  SOON
-                </span>
-              </div>
-              <div className="mt-4 py-8 grid place-items-center text-xs text-muted-foreground font-mono border border-dashed border-border rounded-md">
-                AI Copilot isn't wired up yet — this feed will populate once
-                the AI endpoint is live.
-              </div>
-            </div>
-          </section>
+          {active === "widget" && <WidgetPage org={org} />}
 
-          {/* Queue table */}
-          <section className="rounded-lg border border-border bg-card overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-2 px-4 md:px-5 py-3 border-b border-border">
-              <div>
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                  § Live queue
-                </div>
-                <div className="text-sm font-semibold mt-0.5">Active tickets</div>
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] font-mono">
-                {["All", "Open", "In progress", "Resolved"].map((t, i) => (
-                  <button
-                    key={t}
-                    className={`px-2.5 py-1.5 rounded-md border transition-colors ${
-                      i === 0
-                        ? "border-primary/40 bg-primary/10 text-primary"
-                        : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-[10px] font-mono uppercase tracking-widest text-muted-foreground bg-muted/40">
-                    <th className="px-4 md:px-5 py-2.5 font-normal">ID</th>
-                    <th className="px-2 py-2.5 font-normal">Subject</th>
-                    <th className="px-2 py-2.5 font-normal hidden md:table-cell">Requester</th>
-                    <th className="px-2 py-2.5 font-normal hidden lg:table-cell">Channel</th>
-                    <th className="px-2 py-2.5 font-normal">AI</th>
-                    <th className="px-2 py-2.5 font-normal">Priority</th>
-                    <th className="px-2 py-2.5 font-normal">Status</th>
-                    <th className="px-4 md:px-5 py-2.5 font-normal text-right">Age</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading && (
-                    <tr><td colSpan={8} className="py-8"><LoadingState label="Loading tickets..." /></td></tr>
-                  )}
-                  {!loading && tickets.length === 0 && (
-                    <tr><td colSpan={8}><EmptyState title="No tickets yet" hint="New tickets will appear here" /></td></tr>
-                  )}
-                  {tickets.map((t) => (
-                    <tr key={t._id} className="border-t border-border hover:bg-muted/40 transition-colors">
-                      <td className="px-4 md:px-5 py-3 font-mono text-xs text-muted-foreground">
-                        #{t._id.slice(-4)}
-                      </td>
-                      <td className="px-2 py-3 font-medium max-w-[280px] truncate">
- {t.subject}
-  {t.aiSentiment === "frustrated" || t.aiSentiment === "angry" ? (
-    <span className="ml-2 text-[9px] text-destructive">●</span>
-  ) : null}
-</td>
-                      <td className="px-2 py-3 text-xs text-muted-foreground font-mono hidden md:table-cell">
-                        {t.customerId?.email || "—"}
-                      </td>
-                      <td className="px-2 py-3 text-xs hidden lg:table-cell">Portal</td>
-                       <td className="px-2 py-3">
-                      {t.aiCategory ? (
-                     <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border border-primary/30 bg-primary/5 text-primary">
-                      <span className="size-1 rounded-full bg-current" />
-                      {t.aiCategory}
-                      </span>
-                       ) : (
-                       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border text-muted-foreground">
-                           —
-                      </span>
-                        )}
-                      </td>
-                      <td className="px-2 py-3">
-                        <PrioPill v={t.priority} />
-                      </td>
-                      <td className="px-2 py-3">
-                        <StatusPill v={t.status} />
-                      </td>
-                      <td className="px-4 md:px-5 py-3 text-right text-xs font-mono text-muted-foreground">
-                        {timeAgo(t.createdAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          {comingSoonPages[active] && <ComingSoon {...comingSoonPages[active]} />}
 
-          {/* Agents + AI health */}
-          <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 rounded-lg border border-border bg-card p-4 md:p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                    § Agents on shift
-                  </div>
-                  <div className="text-sm font-semibold mt-0.5">Team workload</div>
-                </div>
-              </div>
-
-              <div className="mt-3 divide-y divide-border">
-                {agents.length === 0 && (
-                  <p className="text-sm text-muted-foreground py-4">No agents yet.</p>
-                )}
-                {agents.map((a) => {
-                  const load = getAgentWorkload(a._id);
-                  return (
-                    <div key={a._id} className="flex items-center gap-3 py-2.5">
-                      <div className="size-9 rounded-full bg-muted grid place-items-center text-xs font-semibold shrink-0">
-                        {a.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium">{a.name}</div>
-                        <div className="text-[11px] text-muted-foreground font-mono">{a.email}</div>
-                      </div>
-                      <div className="hidden sm:flex flex-col items-end gap-1 min-w-[100px]">
-                        <div className="text-[10px] font-mono text-muted-foreground">
-                          Active: {load}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-border bg-card p-4 md:p-5">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                § AI health
-              </div>
-              <div className="mt-1 text-sm font-semibold">Copilot performance</div>
-              <div className="mt-4 py-10 grid place-items-center text-xs text-muted-foreground font-mono border border-dashed border-border rounded-md">
-                AI metrics coming soon.
-              </div>
-            </div>
-          </section>
-
-          {/* Footer */}
           <footer className="pt-2 pb-6 text-[10px] font-mono text-muted-foreground flex flex-wrap items-center justify-between gap-2">
             <div>DeskPilot AI · Admin Console · v1.0</div>
             <div className="flex items-center gap-3">
               <span>Region: ap-south-1</span>
+              <span>·</span>
+              <span>Uptime 99.9%</span>
               <span>·</span>
               <Link to="/login" className="hover:text-foreground">
                 ← Back to login
@@ -450,11 +298,475 @@ const AdminDashboard = () => {
           </footer>
         </main>
       </div>
+
+      {inviteOpen && (
+        <InviteDialog
+          onClose={() => setInviteOpen(false)}
+          onCreated={() => {
+            setInviteOpen(false);
+            fetchAgents();
+          }}
+        />
+      )}
     </div>
   );
 };
 
 export default AdminDashboard;
+
+/* ---------- Page: Overview ---------- */
+
+function OverviewPage({ user, kpis, tickets, agents, loading, timeAgo, getAgentWorkload }) {
+  const queue = tickets.slice(0, 5);
+
+  return (
+    <>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            § 01 · Overview
+          </div>
+          <h1 className="mt-1 text-2xl md:text-3xl font-bold tracking-tight">
+            Good afternoon, {user?.name?.split(" ")[0] || "Admin"}.
+          </h1>
+          <p className="text-sm text-muted-foreground">Here's what's happening across your workspace today.</p>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-mono">
+          {["24h", "7d", "30d", "QTD"].map((r, i) => (
+            <button
+              key={r}
+              className={`px-2.5 py-1.5 rounded-md border transition-colors ${
+                i === 1
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {kpis.map((k) => (
+          <div
+            key={k.label}
+            className="relative rounded-lg border border-border bg-card p-4 hover:border-primary/30 transition-colors group"
+          >
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">{k.label}</div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <div className="text-2xl md:text-3xl font-bold tracking-tight">{k.value}</div>
+            </div>
+            <div className="mt-1 text-[11px] text-muted-foreground font-mono">{k.hint}</div>
+          </div>
+        ))}
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-2 rounded-lg border border-border bg-card p-4 md:p-5">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            § Ticket volume
+          </div>
+          <div className="text-sm font-semibold mt-0.5">Last 14 days</div>
+          <div className="h-40 grid place-items-center text-xs text-muted-foreground">
+            Chart coming soon — needs a volume-by-day endpoint
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-4 md:p-5">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+              § AI Copilot activity
+            </div>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border text-muted-foreground">
+              SOON
+            </span>
+          </div>
+          <div className="h-40 grid place-items-center text-xs text-muted-foreground text-center px-4">
+            AI Copilot isn't wired up yet — this feed will populate once the AI endpoint is live.
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 md:px-5 py-3 border-b border-border">
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+              § Live queue
+            </div>
+            <div className="text-sm font-semibold mt-0.5">Active tickets</div>
+          </div>
+        </div>
+        <TicketTable tickets={queue} loading={loading} timeAgo={timeAgo} />
+      </section>
+
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 rounded-lg border border-border bg-card p-4 md:p-5">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            § Agents on shift
+          </div>
+          <div className="text-sm font-semibold mt-0.5">Team workload</div>
+          <div className="mt-3 divide-y divide-border">
+            {agents.length === 0 && <p className="text-sm text-muted-foreground py-4">No agents yet.</p>}
+            {agents.map((a) => (
+              <div key={a._id} className="flex items-center gap-3 py-2.5">
+                <div className="size-9 rounded-full bg-muted grid place-items-center text-xs font-semibold">
+                  {a.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{a.name}</div>
+                  <div className="text-[11px] text-muted-foreground font-mono">{a.email}</div>
+                </div>
+                <div className="text-[10px] font-mono text-muted-foreground">
+                  Active: {getAgentWorkload(a._id)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-4 md:p-5">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">§ AI health</div>
+          <div className="mt-1 text-sm font-semibold">Copilot performance</div>
+          <div className="h-40 grid place-items-center text-xs text-muted-foreground">AI metrics coming soon.</div>
+        </div>
+      </section>
+    </>
+  );
+}
+
+/* ---------- Page: Tickets ---------- */
+
+function TicketsPage({ tickets, loading, timeAgo, filter, setFilter }) {
+  return (
+    <>
+      <div>
+        <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">§ 02 · Tickets</div>
+        <h1 className="mt-1 text-2xl md:text-3xl font-bold tracking-tight">All tickets</h1>
+        <p className="text-sm text-muted-foreground">Every ticket in your organization, across every channel.</p>
+      </div>
+
+      <section className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 md:px-5 py-3 border-b border-border">
+          <div className="text-sm font-semibold">{tickets.length} tickets</div>
+          <div className="flex items-center gap-1.5 text-[11px] font-mono">
+            {["All", "Open", "In progress", "Resolved"].map((t) => (
+              <button
+                key={t}
+                onClick={() => setFilter(t)}
+                className={`px-2.5 py-1.5 rounded-md border transition-colors ${
+                  filter === t
+                    ? "border-primary/40 bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+        <TicketTable tickets={tickets} loading={loading} timeAgo={timeAgo} />
+      </section>
+    </>
+  );
+}
+
+function TicketTable({ tickets, loading, timeAgo }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-[10px] font-mono uppercase tracking-widest text-muted-foreground bg-muted/40">
+            <th className="px-4 md:px-5 py-2.5 font-normal">ID</th>
+            <th className="px-2 py-2.5 font-normal">Subject</th>
+            <th className="px-2 py-2.5 font-normal hidden md:table-cell">Requester</th>
+            <th className="px-2 py-2.5 font-normal hidden lg:table-cell">Channel</th>
+            <th className="px-2 py-2.5 font-normal">AI</th>
+            <th className="px-2 py-2.5 font-normal">Priority</th>
+            <th className="px-2 py-2.5 font-normal">Status</th>
+            <th className="px-4 md:px-5 py-2.5 font-normal text-right">Age</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loading && (
+            <tr>
+              <td colSpan={8} className="py-8">
+                <LoadingState label="Loading tickets..." />
+              </td>
+            </tr>
+          )}
+          {!loading && tickets.length === 0 && (
+            <tr>
+              <td colSpan={8}>
+                <EmptyState title="No tickets yet" hint="New tickets will appear here" />
+              </td>
+            </tr>
+          )}
+          {tickets.map((t) => (
+            <tr key={t._id} className="border-t border-border hover:bg-muted/40 transition-colors">
+              <td className="px-4 md:px-5 py-3 font-mono text-xs text-muted-foreground">#{t._id.slice(-4)}</td>
+              <td className="px-2 py-3 font-medium max-w-[280px] truncate">
+                {t.subject}
+                {t.aiSentiment === "frustrated" || t.aiSentiment === "angry" ? (
+                  <span className="ml-2 text-[9px] text-destructive">●</span>
+                ) : null}
+              </td>
+              <td className="px-2 py-3 text-xs text-muted-foreground font-mono hidden md:table-cell">
+                {t.customerId?.email || "—"}
+              </td>
+              <td className="px-2 py-3 text-xs hidden lg:table-cell">Portal</td>
+              <td className="px-2 py-3">
+                {t.aiCategory ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border border-primary/30 bg-primary/5 text-primary">
+                    <span className="size-1 rounded-full bg-current" />
+                    {t.aiCategory}
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-border text-muted-foreground">
+                    —
+                  </span>
+                )}
+              </td>
+              <td className="px-2 py-3">
+                <PrioPill v={t.priority} />
+              </td>
+              <td className="px-2 py-3">
+                <StatusPill v={t.status} />
+              </td>
+              <td className="px-4 md:px-5 py-3 text-right text-xs font-mono text-muted-foreground">
+                {timeAgo(t.createdAt)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ---------- Page: Agents ---------- */
+
+function AgentsPage({ agents, loading, getAgentWorkload, onInvite }) {
+  return (
+    <>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">§ 03 · Agents</div>
+          <h1 className="mt-1 text-2xl md:text-3xl font-bold tracking-tight">Team</h1>
+          <p className="text-sm text-muted-foreground">Everyone with agent access in your organization.</p>
+        </div>
+        <button
+          onClick={onInvite}
+          className="inline-flex h-9 items-center gap-1.5 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90"
+        >
+          <IconUsers className="size-4" /> Invite agent
+        </button>
+      </div>
+
+      <section className="rounded-lg border border-border bg-card overflow-hidden">
+        {loading && <LoadingState label="Loading agents..." />}
+        {!loading && agents.length === 0 && (
+          <EmptyState title="No agents yet" hint="Invite your first agent to get started" />
+        )}
+        <div className="divide-y divide-border">
+          {agents.map((a) => (
+            <div key={a._id} className="flex items-center gap-3 px-4 md:px-5 py-3">
+              <div className="size-10 rounded-full bg-muted grid place-items-center text-sm font-semibold">
+                {a.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium">{a.name}</div>
+                <div className="text-xs text-muted-foreground font-mono">{a.email}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                  Active tickets
+                </div>
+                <div className="text-sm font-semibold">{getAgentWorkload(a._id)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+/* ---------- Page: Widget ---------- */
+
+function WidgetPage({ org }) {
+  const [copied, setCopied] = useState(false);
+  const orgSlug = org?.slug || "your-org-slug";
+  const snippet = `<script src="${window.location.origin}/widget.js" data-org-id="${orgSlug}"></script>`;
+
+  const copySnippet = () => {
+    navigator.clipboard.writeText(snippet);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <>
+      <div>
+        <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">§ 04 · Widget</div>
+        <h1 className="mt-1 text-2xl md:text-3xl font-bold tracking-tight">Embed your widget</h1>
+        <p className="text-sm text-muted-foreground">
+          Paste this snippet before the closing <code className="font-mono">&lt;/body&gt;</code> tag on your
+          website.
+        </p>
+      </div>
+
+      <section className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-4 md:px-5 py-3 border-b border-border">
+          <div className="text-sm font-semibold">Install snippet</div>
+          <button
+            onClick={copySnippet}
+            className="text-xs font-mono px-2.5 py-1.5 rounded-md border border-border hover:bg-muted transition-colors"
+          >
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        </div>
+        <pre className="p-4 md:p-5 font-mono text-xs md:text-sm overflow-x-auto bg-muted/30">{snippet}</pre>
+      </section>
+
+      <section className="rounded-lg border border-border bg-card p-4 md:p-5">
+        <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">
+          Your workspace
+        </div>
+        <div className="text-sm">
+          Organization: <span className="font-mono font-medium">{org?.name || "—"}</span>
+        </div>
+        <div className="text-sm mt-1">
+          Slug: <span className="font-mono font-medium">{orgSlug}</span>
+        </div>
+      </section>
+    </>
+  );
+}
+
+/* ---------- Coming soon (generic) ---------- */
+
+function ComingSoon({ title, desc }) {
+  return (
+    <div>
+      <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">{title}</div>
+      <h1 className="mt-1 text-2xl md:text-3xl font-bold tracking-tight">{title}</h1>
+      <div className="mt-6 rounded-lg border border-dashed border-border bg-card/50 p-10 text-center">
+        <div className="size-10 mx-auto rounded-full bg-muted grid place-items-center mb-3">
+          <IconSpark className="size-5 text-muted-foreground" />
+        </div>
+        <p className="text-sm font-medium">Coming soon</p>
+        <p className="mt-1 text-xs text-muted-foreground max-w-sm mx-auto">{desc}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Invite dialog ---------- */
+
+function InviteDialog({ onClose, onCreated }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("agent");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const { createUser } = await import("../api/users");
+      await createUser({ name, email, password, role });
+      onCreated();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to create account");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 backdrop-blur-sm p-4">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <div className="text-sm font-semibold">Invite team member</div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            ✕
+          </button>
+        </div>
+        <form onSubmit={submit} className="p-5 space-y-3">
+          {error && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="text-[11px] font-medium text-muted-foreground">Role</label>
+            <div className="mt-1 flex gap-1">
+              {["agent", "customer"].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(r)}
+                  className={`flex-1 rounded-md border px-2 py-2 text-xs capitalize ${
+                    role === r
+                      ? "border-primary/50 bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-medium text-muted-foreground">Name</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary/60"
+            />
+          </div>
+          <div>
+            <label className="text-[11px] font-medium text-muted-foreground">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary/60"
+            />
+          </div>
+          <div>
+            <label className="text-[11px] font-medium text-muted-foreground">Temporary password</label>
+            <input
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              placeholder="min 6 characters"
+              className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary/60"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+          >
+            {loading ? "Creating..." : `Create ${role} account`}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 /* ---------- Small display components ---------- */
 
@@ -466,11 +778,7 @@ function PrioPill({ v }) {
     low: "text-muted-foreground border-border",
   };
   const label = { urgent: "Urgent", high: "High", medium: "Med", low: "Low" };
-  return (
-    <span className={`inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border ${map[v] || "border-border text-muted-foreground"}`}>
-      {label[v] || v}
-    </span>
-  );
+  return <span className={`inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border ${map[v]}`}>{label[v] || v}</span>;
 }
 
 function StatusPill({ v }) {
@@ -481,14 +789,10 @@ function StatusPill({ v }) {
     closed: "text-muted-foreground border-border",
   };
   const label = { open: "Open", in_progress: "In progress", resolved: "Resolved", closed: "Closed" };
-  return (
-    <span className={`inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border ${map[v] || "border-border text-muted-foreground"}`}>
-      {label[v] || v}
-    </span>
-  );
+  return <span className={`inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border ${map[v]}`}>{label[v] || v}</span>;
 }
 
-/* ---------- Icons (hand-drawn SVGs, no external icon library needed) ---------- */
+/* ---------- Icons ---------- */
 
 function IconGrid({ className }) {
   return (

@@ -21,9 +21,9 @@ const Login = () => {
 
     try {
       const res = await loginUser({ orgSlug, email, password });
-      const { token, user } = res.data;
+      const { token, user, org } = res.data;
 
-      login(user, token);
+      login(user, token, org);
 
       if (user.role === "admin") navigate("/admin");
       else if (user.role === "agent") navigate("/agent");

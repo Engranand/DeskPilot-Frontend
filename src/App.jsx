@@ -7,12 +7,13 @@ import AgentInbox from "./pages/AgentInbox";
 import GuestTracker from "./pages/GuestTracker";
 import Widget from "./pages/Widget";
 import Register from "./pages/Register";
+import Landing from "./pages/Landing";
 
 function App() {
   return (
     <Routes>
-      {/* Root path — abhi koi landing page nahi hai, isliye /login pe redirect */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      {/* Root path — Landing page render hoga */}
+      <Route path="/" element={<Landing />} />
 
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -49,7 +50,7 @@ function App() {
       {/* Widget Route */}
       <Route path="/widget" element={<Widget />} />
 
-      {/* Catch-all — koi bhi unknown path /login pe bhej do, taaki wahan bhi blank screen na aaye */}
+      {/* Catch-all — koi bhi unknown path /login pe bhej do */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
